@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Data.Aztecs.Archetypes
   ( ArchetypeID (..),
@@ -43,7 +44,7 @@ newtype ArchetypeID = ArchetypeID {unArchetypeId :: Int}
 
 -- | Set of component IDs.
 newtype ComponentIDSet = ComponentIDSet {unComponentIdSet :: (Set ComponentID)}
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Semigroup, Monoid)
 
 -- | Archetype component storage.
 data Archetype = Archetype

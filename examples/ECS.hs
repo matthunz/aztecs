@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Main where
 
 import Control.Monad.IO.Class
@@ -19,14 +21,14 @@ app = do
   e' <- C.spawn (Position 1)
   C.insert e' (Velocity 1)
 
-  q <-
-    Q.all
-      ( Q.writeWith
-          Q.read
-          ( \(Velocity v) (Position p) ->
-              (Position (p + v), (p, v))
-          )
-      )
+  q <- Q.lookupT e $ do
+    p <- Q.readT @_ @Position
+    v <- Q.readT @_ @Velocity
+    return $ do
+      p' <- p
+      v' <- v
+      return (p', v')
+
   liftIO $ pPrint q
 
 main :: IO ()
