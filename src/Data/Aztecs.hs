@@ -4,6 +4,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Data.Aztecs where
@@ -31,9 +34,27 @@ instance ShowEntity (Entity '[]) where
 instance (Show t, ShowEntity (Entity ts)) => ShowEntity (Entity (t ': ts)) where
   showEntity (ECons x xs) = ", " ++ show x ++ showEntity xs
 
+entity :: a -> Entity '[a]
+entity = flip ECons ENil
+
 data Archetype (ts :: [Type]) where
   ANil :: Archetype '[]
   ACons :: Vector t -> Archetype ts -> Archetype (t ': ts)
+
+instance Show (Archetype '[]) where
+  show ANil = "[]"
+
+instance (Show t, ShowArchetype (Archetype ts)) => Show (Archetype (t ': ts)) where
+  show (ACons x xs) = "[" ++ show x ++ showArchetype xs
+
+class ShowArchetype a where
+  showArchetype :: a -> String
+
+instance ShowArchetype (Archetype '[]) where
+  showArchetype ANil = "]"
+
+instance (Show t, ShowArchetype (Archetype ts)) => ShowArchetype (Archetype (t ': ts)) where
+  showArchetype (ACons x xs) = ", " ++ show x ++ showArchetype xs
 
 arch :: [a] -> Archetype '[a]
 arch as = ACons (V.fromList as) ANil
@@ -43,31 +64,58 @@ arch as = ACons (V.fromList as) ANil
 
 class Has a l where
   component :: l -> a
+  setComponent :: a -> l -> l
+
+instance {-# OVERLAPPING #-} Has a (Entity (a ': ts)) where
+  component (ECons x _) = x
+  setComponent x (ECons _ xs) = ECons x xs
+
+instance {-# OVERLAPPING #-} (Has a (Entity ts)) => Has a (Entity (b ': ts)) where
+  component (ECons _ xs) = component xs
+  setComponent x (ECons y xs) = ECons y (setComponent x xs)
 
 instance {-# OVERLAPPING #-} Has [a] (Archetype (a ': ts)) where
   component (ACons v _) = V.toList v
+  setComponent v (ACons _ xs) = ACons (V.fromList v) xs
 
 instance {-# OVERLAPPING #-} (Has [a] (Archetype ts)) => Has [a] (Archetype (b ': ts)) where
   component (ACons _ xs) = component xs
+  setComponent v (ACons x xs) = ACons x (setComponent v xs)
 
 class Match (as :: [Type]) (es :: [Type]) where
   match :: Archetype as -> [Entity es]
+  alter :: [Entity es] -> Archetype as -> Archetype as
 
 instance Match as '[] where
   match _ = []
+  alter _ as = as
 
 instance {-# OVERLAPS #-} (Has [e] (Archetype as)) => Match as '[e] where
   match as =
     let es = component as
         f e = ECons e ENil
-     in map f es
+     in fmap f es
+  alter es as =
+    let (es', es'') = unzip $ fmap (\(ECons e t) -> (e, t)) es
+        as' = setComponent es' as
+     in alter es'' as'
 
-instance (Match as es, Has [e] (Archetype as)) => Match as (e ': es) where
+instance forall as es e. (Match as es, Has [e] (Archetype as)) => Match as (e ': es) where
   match as =
     let es = component as
         entities = match as
         f (e, y) = ECons e y
-     in map f (zip es entities)
+     in fmap f (zip es entities)
+  alter es as =
+    let (es', es'') = unzip $ fmap (\(ECons e t) -> (e, t)) es
+        as' = setComponent es' as
+     in alter es'' as'
 
 query :: (Match as bs) => Archetype as -> [Entity bs]
 query = match
+
+map :: (Match as bs) => Archetype as -> (Entity bs -> Entity bs) -> Archetype as
+map a f =
+  let es = match a
+      es' = fmap f es
+   in alter es' a
