@@ -5,9 +5,9 @@
 
 module Data.Aztecs.World where
 
+import Data.Aztecs (Component, EntityID (..))
 import Data.Aztecs.Components (ComponentID, Components)
 import qualified Data.Aztecs.Components as CS
-import Data.Aztecs.Entity (Component)
 import Data.Aztecs.Table (ColumnID (..), RowID (..), Table)
 import qualified Data.Aztecs.Table as Table
 import Data.Data (Proxy (..))
@@ -15,9 +15,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-
-newtype EntityID = EntityID {unEntityId :: Int}
-  deriving (Eq, Ord, Show)
 
 -- | Archetype ID.
 newtype ArchetypeID = ArchetypeID {unArchetypeId :: Int}

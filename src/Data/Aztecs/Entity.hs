@@ -15,7 +15,9 @@
 
 module Data.Aztecs.Entity where
 
-import Data.Data (Typeable)
+import Data.Aztecs (Component, EntityID)
+import Data.Aztecs.World (World)
+import qualified Data.Aztecs.World as W
 import Data.Kind (Type)
 
 data Entity (ts :: [Type]) where
@@ -54,8 +56,6 @@ entity t = ECons t ENil
 
 data (:&) a b = (:&) a b
 
-class (Typeable a) => Component a
-
 type family EntityT a where
   EntityT (a :& b) = a ': EntityT b
   EntityT (Entity ts) = ts
@@ -84,3 +84,15 @@ instance ToEntity (Entity ts) where
 
 instance (ToEntity a, ToEntity b, EntityT (a :& b) ~ (a ': EntityT b)) => ToEntity (a :& b) where
   toEntity (a :& b) = ECons a (toEntity b)
+
+class Insertable a where
+  spawn :: a -> World -> (EntityID, World)
+  insert :: EntityID -> a -> World -> World
+
+instance Insertable (Entity '[]) where
+  spawn ENil w = (W.nextEntityId w, w)
+  insert _ ENil w = w
+
+instance (Component a, Insertable (Entity as)) => Insertable (Entity (a ': as)) where
+  spawn (ECons x xs) w = let (e, w') = W.spawn x w in (e, insert e xs w')
+  insert eId (ECons x xs) w = insert eId xs $ W.insert eId x w

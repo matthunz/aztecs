@@ -3,6 +3,9 @@
 
 module Main where
 
+import Data.Aztecs (Component)
+import Data.Aztecs.Access (Access)
+import qualified Data.Aztecs.Access as A
 import Data.Aztecs.Entity
 import qualified Data.Aztecs.World as W
 import Text.Pretty.Simple
@@ -15,8 +18,12 @@ newtype Y = Y Int deriving (Eq, Show)
 
 instance Component Y
 
+app :: Access IO ()
+app = do
+  A.spawn_ (entity (X 0) <&> Y 1)
+  return ()
+
 main :: IO ()
 main = do
-  let (e, w) = W.spawn (X 0) W.empty
-      w' = W.insert e (Y 1) w
-  pPrint w'
+  (_, w) <- A.runAccess app W.empty
+  pPrint w
