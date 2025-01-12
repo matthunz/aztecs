@@ -138,6 +138,33 @@ instance ShowArchetypes (Archetypes '[]) where
 instance (Show (Archetype cs), ShowArchetypes (Archetypes as)) => ShowArchetypes (Archetypes (cs ': as)) where
   showArchetypes (ASCons x xs) = ", " ++ show x ++ showArchetypes xs
 
+class EmptyArchetype (as :: [Type]) where
+  emptyArchetype :: Archetype as
+
+instance EmptyArchetype '[] where
+  emptyArchetype = ANil
+
+instance (EmptyArchetype as) => EmptyArchetype (a ': as) where
+  emptyArchetype = ACons V.empty emptyArchetype
+
+class SpawnArchetype (a :: [Type]) (as :: [Type]) where
+  spawnArchetype :: Entity a -> Archetype as -> Archetype as
+
+instance SpawnArchetype '[] as where
+  spawnArchetype _ as = as
+
+instance (SpawnArchetype as as) => SpawnArchetype (a ': as) (a ': as) where
+  spawnArchetype (ECons e es) (ACons v as) = ACons (V.cons e v) (spawnArchetype es as)
+
+class EmptyArchetypes (as :: [[Type]]) where
+  emptyArchetypes :: Archetypes as
+
+class SpawnArchetypes (a :: [Type]) (as :: [[Type]]) where
+  spawnArchetypes :: Entity a -> Archetypes as -> Archetypes as
+
+instance (SpawnArchetype a a) => SpawnArchetypes a (a ': as) where
+  spawnArchetypes e (ASCons x xs) = ASCons (spawnArchetype e x) xs
+
 type family CombineT (a :: Type) (as :: [Type]) :: [[Type]] where
   CombineT a '[] = '[ '[a]]
   CombineT a (b ': bs) = '[a] ': '[b] ': '[a, b] ': CombineT a bs
@@ -146,10 +173,27 @@ type family CombineT' (as :: [Type]) :: [[Type]] where
   CombineT' '[] = '[]
   CombineT' (a ': as) = CombineT a as
 
-data World cs = World (Archetypes (CombineT' cs))
+newtype EntityID = EntityID {unEntityId :: Int} deriving (Show)
+
+data World cs = World (Archetypes (CombineT' cs)) EntityID
 
 instance (Show (Archetypes (CombineT' cs))) => Show (World cs) where
-  show (World as) = show as
+  show (World as e) = "World " ++ show as ++ show e
 
-world :: World '[]
-world = World ASNil
+class Empty (as :: [[Type]]) where
+  empty :: Archetypes as
+
+instance Empty '[] where
+  empty = ASNil
+
+instance (EmptyArchetype a, Empty as) => Empty (a ': as) where
+  empty = ASCons emptyArchetype empty
+
+class Spawn (a :: [Type]) (as :: [Type]) where
+  spawn :: Entity a -> World as -> World as
+
+instance (SpawnArchetypes a (CombineT' as)) => Spawn a as where
+  spawn x (World as e) = World (spawnArchetypes x as) (EntityID $ unEntityId e + 1)
+
+world :: (Empty (CombineT' cs)) => World cs
+world = World empty (EntityID 0)

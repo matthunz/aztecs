@@ -8,5 +8,6 @@ import Text.Pretty.Simple
 
 main :: IO ()
 main = do
-  let w = world
-  pPrint w
+  let w = world @'[Bool]
+      w' = spawn (entity True) w 
+  pPrint w'
