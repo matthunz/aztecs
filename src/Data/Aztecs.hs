@@ -7,7 +7,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.Aztecs where
 
@@ -55,9 +57,6 @@ instance ShowArchetype (Archetype '[]) where
 
 instance (Show t, ShowArchetype (Archetype ts)) => ShowArchetype (Archetype (t ': ts)) where
   showArchetype (ACons x xs) = ", " ++ show x ++ showArchetype xs
-
-arch :: [a] -> Archetype '[a]
-arch as = ACons (V.fromList as) ANil
 
 (<&>) :: Archetype ts -> [t] -> Archetype (t : ts)
 (<&>) a v = ACons (V.fromList v) a
@@ -119,3 +118,38 @@ map a f =
   let es = match a
       es' = fmap f es
    in alter es' a
+
+data Archetypes (ts :: [[Type]]) where
+  ASNil :: Archetypes '[]
+  ASCons :: Archetype as -> Archetypes ts -> Archetypes (as ': ts)
+
+instance Show (Archetypes '[]) where
+  show ASNil = "[]"
+
+instance (Show (Archetype as), ShowArchetypes (Archetypes es)) => Show (Archetypes (as ': es)) where
+  show (ASCons x xs) = "[" ++ show x ++ showArchetypes xs
+
+class ShowArchetypes a where
+  showArchetypes :: a -> String
+
+instance ShowArchetypes (Archetypes '[]) where
+  showArchetypes ASNil = "]"
+
+instance (Show (Archetype cs), ShowArchetypes (Archetypes as)) => ShowArchetypes (Archetypes (cs ': as)) where
+  showArchetypes (ASCons x xs) = ", " ++ show x ++ showArchetypes xs
+
+type family CombineT (a :: Type) (as :: [Type]) :: [[Type]] where
+  CombineT a '[] = '[ '[a]]
+  CombineT a (b ': bs) = '[a] ': '[b] ': '[a, b] ': CombineT a bs
+
+type family CombineT' (as :: [Type]) :: [[Type]] where
+  CombineT' '[] = '[]
+  CombineT' (a ': as) = CombineT a as
+
+data World cs = World (Archetypes (CombineT' cs))
+
+instance (Show (Archetypes (CombineT' cs))) => Show (World cs) where
+  show (World as) = show as
+
+world :: World '[]
+world = World ASNil
