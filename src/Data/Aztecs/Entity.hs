@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -16,9 +17,15 @@
 module Data.Aztecs.Entity where
 
 import Data.Aztecs (Component, EntityID)
-import Data.Aztecs.World (World)
+import qualified Data.Aztecs.Components as CS
+import Data.Aztecs.Table (Table)
+import qualified Data.Aztecs.Table as Table
+import Data.Aztecs.World (ArchetypeID, ComponentIDSet (..), World)
 import qualified Data.Aztecs.World as W
 import Data.Kind (Type)
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import Prelude hiding (all)
 
 -- | Entity of components.
 data Entity (ts :: [Type]) where
@@ -104,3 +111,30 @@ instance Insertable (Entity '[]) where
 instance (Component a, Insertable (Entity as)) => Insertable (Entity (a ': as)) where
   spawn (ECons x xs) w = let (e, w') = W.spawn x w in (e, insert e xs w')
   insert eId (ECons x xs) w = insert eId xs $ W.insert eId x w
+
+class Queryable a where
+  all :: World -> (ComponentIDSet, World, Table -> ArchetypeID -> World -> [a])
+
+instance {-# OVERLAPS #-} (Component a) => Queryable (Entity '[a]) where
+  all w =
+    let (cId, cs) = CS.insert @a (W.components w)
+        w' = w {W.components = cs}
+        f table archId wAcc =
+          let cState = W.componentStates wAcc Map.! cId
+              colId = W.componentColumnIds cState Map.! archId
+              as = Table.toList @a colId table
+           in map (\a -> ECons a ENil) as
+     in (ComponentIDSet (Set.singleton cId), w', f)
+
+instance {-# OVERLAPS #-} (Component a, Queryable (Entity as)) => Queryable (Entity (a ': as)) where
+  all w =
+    let (cId, cs) = CS.insert @a (W.components w)
+        w' = w {W.components = cs}
+        (idSet, w'', g) = all @(Entity as) w'
+        f table archId wAcc =
+          let cState = W.componentStates wAcc Map.! cId
+              colId = W.componentColumnIds cState Map.! archId
+              as = Table.toList @a colId table
+              es = g table archId wAcc
+           in zipWith (\a e -> ECons a e) as es
+     in (ComponentIDSet (Set.singleton cId) <> idSet, w'', f)

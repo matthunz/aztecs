@@ -3,6 +3,7 @@
 
 module Main where
 
+import Control.Monad.IO.Class
 import Data.Aztecs (Component)
 import Data.Aztecs.Access (Access)
 import qualified Data.Aztecs.Access as A
@@ -21,9 +22,13 @@ instance Component Y
 app :: Access IO ()
 app = do
   A.spawn_ (entity (X 0) <&> Y 1)
+
+  q <- A.all @_ @(Entity '[X, Y])
+  liftIO $ pPrint q
+
   return ()
 
 main :: IO ()
 main = do
-  (_, w) <- A.runAccess app W.empty
-  pPrint w
+  _ <- A.runAccess app W.empty
+  return ()

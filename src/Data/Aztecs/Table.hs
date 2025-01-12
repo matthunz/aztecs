@@ -11,6 +11,7 @@ module Data.Aztecs.Table
     insert,
     insertCons,
     remove,
+    toList
   )
 where
 
@@ -66,3 +67,12 @@ remove (ColumnID c) (RowID r) (Table v) = case fromDynamic (v V.! r) of
         v' = V.modify (\acc -> MV.write acc r (toDyn $ Column col')) v
      in (a, Table v')
   Nothing -> error "TODO"
+
+toList :: (Typeable a) => ColumnID -> Table -> [a]
+toList (ColumnID c) (Table v) =
+  map
+    ( \(Column col) ->
+        col V.! c
+    )
+    $ map (\dyn -> fromMaybe (error "TODO") $ fromDynamic dyn)
+    $ V.toList v

@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -22,7 +23,7 @@ newtype ArchetypeID = ArchetypeID {unArchetypeId :: Int}
 
 -- | Set of component IDs.
 newtype ComponentIDSet = ComponentIDSet {unComponentIdSet :: (Set ComponentID)}
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Semigroup, Monoid)
 
 -- | Archetype component storage.
 data Archetype = Archetype
@@ -167,19 +168,15 @@ insert e c w =
            in case Map.lookup nextIdSet (archetypeIds w) of
                 Just nextArchId -> error "TODO"
                 Nothing ->
-                  let nextArchId = nextArchetypeId w
-                      nextArch =
+                  let nextArch =
                         Archetype
                           { archetypeIdSet = nextIdSet,
                             archetypeTable = Table.singleton c,
                             archetypeAdd = Map.empty,
                             archetypeRemove = Map.empty
                           }
-                      w' = moveArchetype e record arch nextArchId nextArch w
-                   in w'
-                        { archetypeIds = Map.insert (archetypeIdSet arch) (recordArchetypeId record) (archetypeIds w'),
-                          nextArchetypeId = ArchetypeID (unArchetypeId nextArchId + 1)
-                        }
+                      (nextArchId, w') = insertArchetype nextArch w
+                   in moveArchetype e record arch nextArchId nextArch w'
 
 insertWithId :: forall c. (Component c) => EntityID -> ComponentID -> c -> World -> World
 insertWithId e cId c w =

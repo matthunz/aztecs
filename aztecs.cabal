@@ -16,7 +16,6 @@ library
 
         Data.Aztecs.Access
         Data.Aztecs.Entity
-        Data.Aztecs.Query
         Data.Aztecs.Table
         Data.Aztecs.World
 

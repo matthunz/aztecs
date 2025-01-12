@@ -3,15 +3,17 @@
 module Data.Aztecs.Access where
 
 import Control.Monad (void)
-import Control.Monad.State (MonadState (..), StateT (..))
+import Control.Monad.State (MonadIO, MonadState (..), StateT (..))
 import Data.Aztecs (EntityID)
-import Data.Aztecs.Entity (Insertable)
+import Data.Aztecs.Entity (Insertable, Queryable)
 import qualified Data.Aztecs.Entity as E
 import Data.Aztecs.World (World)
+import qualified Data.Aztecs.World as W
+import qualified Data.Map as Map
 
 -- | Mutable access to the @World@.
 newtype Access m a = Access (StateT World m a)
-  deriving (Functor, Applicative, Monad)
+  deriving (Functor, Applicative, Monad, MonadIO)
 
 -- | Run an @Access@, modifying a @World@.
 runAccess :: Access m a -> World -> m (a, World)
@@ -34,3 +36,12 @@ insert :: (Monad m, Insertable a) => EntityID -> a -> Access m ()
 insert e c = Access $ do
   w <- get
   put $ E.insert e c w
+
+all :: (Monad m, Queryable a) => Access m [a]
+all = Access $ do
+  w <- get
+  let (idSet, w', f) = E.all w
+      archId = W.archetypeIds w' Map.! idSet
+      arch = W.archetypes w' Map.! archId
+  put w'
+  return $ f (W.archetypeTable arch) archId w'
