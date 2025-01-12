@@ -3,11 +3,13 @@
 
 module Main where
 
+import Data.Aztecs.Entity
+import Data.Aztecs.World
 import Data.Aztecs
 import Text.Pretty.Simple
 
 main :: IO ()
 main = do
   let w = world @'[Bool]
-      w' = spawn (entity True) w 
+      w' = spawn (entity True) w
   pPrint w'
