@@ -8,6 +8,6 @@ import Text.Pretty.Simple
 
 main :: IO ()
 main = do
-  let a = arch @Int [1, 2, 3]
-      b = query @_ @'[Int] a
+  let a = arch @Int [1, 2, 3] <&> ["abc"]
+      b = query @_ @'[String, Int] a
   pPrint b

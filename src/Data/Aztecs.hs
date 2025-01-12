@@ -38,24 +38,36 @@ data Archetype (ts :: [Type]) where
 arch :: [a] -> Archetype '[a]
 arch as = ACons (V.fromList as) ANil
 
-class Match (as :: [Type]) (bs :: [Type]) where
-  match :: Archetype as -> [Entity bs]
+(<&>) :: Archetype ts -> [t] -> Archetype (t : ts)
+(<&>) a v = ACons (V.fromList v) a
 
-instance Match '[] '[] where
-  match ANil = []
+class Has a l where
+  component :: l -> a
 
-instance {-# OVERLAPS #-} Match '[a] '[a] where
-  match (ACons v _) =
-    let bs = (V.toList v)
-        f a = ECons a ENil
-     in map f bs
+instance {-# OVERLAPPING #-} Has [a] (Archetype (a ': ts)) where
+  component (ACons v _) = V.toList v
 
-instance (Match as bs) => Match (a ': as) (a ': bs) where
-  match (ACons v as) =
-    let bs = (V.toList v)
-        es = match as
-        f (a, b) = ECons a b
-     in map f (zip bs es)
+instance {-# OVERLAPPING #-} (Has [a] (Archetype ts)) => Has [a] (Archetype (b ': ts)) where
+  component (ACons _ xs) = component xs
+
+class Match (as :: [Type]) (es :: [Type]) where
+  match :: Archetype as -> [Entity es]
+
+instance Match as '[] where
+  match _ = []
+
+instance {-# OVERLAPS #-} (Has [e] (Archetype as)) => Match as '[e] where
+  match as =
+    let es = component as
+        f e = ECons e ENil
+     in map f es
+
+instance (Match as es, Has [e] (Archetype as)) => Match as (e ': es) where
+  match as =
+    let es = component as
+        entities = match as
+        f (e, y) = ECons e y
+     in map f (zip es entities)
 
 query :: (Match as bs) => Archetype as -> [Entity bs]
 query = match
