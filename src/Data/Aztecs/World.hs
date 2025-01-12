@@ -118,16 +118,16 @@ spawn c w =
                           }
                       )
         Nothing ->
-          let archId = nextArchetypeId w
-              nextArch =
+          let nextArch =
                 Archetype
                   { archetypeIdSet = idSet,
                     archetypeTable = Table.singleton c,
                     archetypeAdd = Map.empty,
                     archetypeRemove = Map.empty
                   }
+              (archId, w') = insertArchetype nextArch w
            in ( e,
-                w
+                w'
                   { components = components',
                     componentStates =
                       Map.insert
@@ -139,14 +139,7 @@ spawn c w =
                         )
                         (componentStates w),
                     entities = Map.insert e (EntityRecord {recordArchetypeId = archId, recordRowId = RowID 0}) (entities w),
-                    nextEntityId = EntityID (unEntityId e + 1),
-                    archetypes =
-                      Map.insert
-                        archId
-                        nextArch
-                        (archetypes w),
-                    archetypeIds = Map.insert idSet archId (archetypeIds w),
-                    nextArchetypeId = ArchetypeID (unArchetypeId archId + 1)
+                    nextEntityId = EntityID (unEntityId e + 1)
                   }
               )
 
@@ -185,9 +178,9 @@ insert e c w =
                             archetypeAdd = Map.empty,
                             archetypeRemove = Map.empty
                           }
-                      w' = moveArchetype record (recordArchetypeId record) arch nextArchId nextArch w
+                      w' = moveArchetype e record arch nextArchId nextArch w
                    in w'
-                        { archetypeIds = Map.insert (archetypeIdSet arch) (recordArchetypeId record) (archetypeIds w),
+                        { archetypeIds = Map.insert (archetypeIdSet arch) (recordArchetypeId record) (archetypeIds w'),
                           nextArchetypeId = ArchetypeID (unArchetypeId nextArchId + 1)
                         }
 
@@ -207,22 +200,31 @@ insertWithId e cId c w =
                     archetypeAdd = Map.empty,
                     archetypeRemove = Map.empty
                   }
-              w' = moveArchetype record (recordArchetypeId record) arch nextArchId nextArch w
+              w' = moveArchetype e record arch nextArchId nextArch w
            in w'
                 { archetypeIds = Map.insert (archetypeIdSet arch) (recordArchetypeId record) (archetypeIds w),
                   nextArchetypeId = ArchetypeID (unArchetypeId nextArchId + 1)
                 }
 
-moveArchetype :: EntityRecord -> ArchetypeID -> Archetype -> ArchetypeID -> Archetype -> World -> World
-moveArchetype record archId arch nextArchId nextArch w =
+moveArchetype :: EntityID -> EntityRecord -> Archetype -> ArchetypeID -> Archetype -> World -> World
+moveArchetype e record arch nextArchId nextArch w =
   let (arch', nextArch') = moveRecord arch nextArch record w
    in w
         { archetypes =
             Map.fromList
-              [ (archId, arch'),
+              [ (recordArchetypeId record, arch'),
                 (nextArchId, nextArch')
               ]
-              <> archetypes w
+              <> archetypes w,
+          entities =
+            Map.insert
+              e
+              ( EntityRecord
+                  { recordArchetypeId = nextArchId,
+                    recordRowId = recordRowId record
+                  }
+              )
+              (entities w)
         }
 
 moveRecord :: Archetype -> Archetype -> EntityRecord -> World -> (Archetype, Archetype)
@@ -233,15 +235,14 @@ moveRecord arch nextArch record w =
    in foldr f (arch, nextArch) (unComponentIdSet (archetypeIdSet arch))
 
 moveComponent :: ComponentProxy -> EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
-moveComponent (ComponentProxy p) = moveComponentProxy p
+moveComponent (ComponentProxy p) = goProxy p
+  where
+    goProxy :: forall c. (Component c) => Proxy c -> EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
+    goProxy _ = go @c
 
-moveComponentProxy :: forall c. (Component c) => Proxy c -> EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
-moveComponentProxy _ = moveComponent' @c
-
-moveComponent' :: forall c. (Component c) => EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
-moveComponent' record cState arch nextArch =
-  let colId = componentColumnIds cState Map.! recordArchetypeId record
-      nextColId = componentColumnIds cState Map.! recordArchetypeId record
-      (c, acc') = Table.remove @c colId (recordRowId record) (archetypeTable arch)
-      nextAcc' = Table.insertCons @c nextColId c (archetypeTable nextArch)
-   in (arch {archetypeTable = acc'}, nextArch {archetypeTable = nextAcc'})
+    go :: forall c. (Component c) => EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
+    go record cState arch nextArch =
+      let colId = componentColumnIds cState Map.! recordArchetypeId record
+          (c, acc') = Table.remove @c colId (recordRowId record) (archetypeTable arch)
+          nextAcc' = Table.cons c (archetypeTable nextArch)
+       in (arch {archetypeTable = acc'}, nextArch {archetypeTable = nextAcc'})
