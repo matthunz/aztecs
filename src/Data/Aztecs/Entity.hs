@@ -15,6 +15,7 @@
 
 module Data.Aztecs.Entity where
 
+import Data.Data (Typeable)
 import Data.Kind (Type)
 
 data Entity (ts :: [Type]) where
@@ -53,7 +54,7 @@ entity t = ECons t ENil
 
 data (:&) a b = (:&) a b
 
-class Component a
+class (Typeable a) => Component a
 
 type family EntityT a where
   EntityT (a :& b) = a ': EntityT b
