@@ -13,7 +13,6 @@ library
     exposed-modules:
         Data.Aztecs
         Data.Aztecs.Components
-
         Data.Aztecs.Access
         Data.Aztecs.Entity
         Data.Aztecs.Table

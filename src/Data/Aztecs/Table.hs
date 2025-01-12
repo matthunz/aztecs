@@ -11,7 +11,8 @@ module Data.Aztecs.Table
     insert,
     insertCons,
     remove,
-    toList
+    toList,
+    length,
   )
 where
 
@@ -21,6 +22,7 @@ import Data.Maybe (fromMaybe)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
+import Prelude hiding (length)
 
 newtype ColumnID = ColumnID {unColumnID :: Int}
   deriving (Eq, Ord, Show)
@@ -38,7 +40,7 @@ singleton :: (Typeable a) => a -> Table
 singleton c = Table $ V.singleton (toDyn $ Column $ V.singleton c)
 
 cons :: (Typeable a) => a -> Table -> Table
-cons c (Table v) = Table $ V.cons (toDyn $ Column $ V.singleton c) v
+cons c (Table v) = Table $ V.cons  (toDyn $ Column $ V.singleton c) v
 
 insertCons :: (Typeable a) => ColumnID -> a -> Table -> Table
 insertCons (ColumnID colId) c (Table table) =
@@ -69,10 +71,9 @@ remove (ColumnID c) (RowID r) (Table v) = case fromDynamic (v V.! r) of
   Nothing -> error "TODO"
 
 toList :: (Typeable a) => ColumnID -> Table -> [a]
-toList (ColumnID c) (Table v) =
-  map
-    ( \(Column col) ->
-        col V.! c
-    )
-    $ map (\dyn -> fromMaybe (error "TODO") $ fromDynamic dyn)
-    $ V.toList v
+toList (ColumnID colId) (Table t) =
+  let (Column col) = fromMaybe (error "TODO") $ fromDynamic (t V.! colId)
+   in V.toList col
+
+length :: Table -> Int
+length (Table v) = V.length v
