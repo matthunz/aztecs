@@ -20,6 +20,7 @@ import Data.Aztecs.World (World)
 import qualified Data.Aztecs.World as W
 import Data.Kind (Type)
 
+-- | Entity of components.
 data Entity (ts :: [Type]) where
   ENil :: Entity '[]
   ECons :: t -> Entity ts -> Entity (t ': ts)
@@ -39,7 +40,9 @@ instance ShowEntity (Entity '[]) where
 instance (Show t, ShowEntity (Entity ts)) => ShowEntity (Entity (t ': ts)) where
   showEntity (ECons x xs) = ", " ++ show x ++ showEntity xs
 
+-- | Component accessor.
 class Has a l where
+  -- | Get a component.
   component :: l -> a
 
 instance {-# OVERLAPPING #-} Has a (Entity (a ': ts)) where
@@ -48,9 +51,11 @@ instance {-# OVERLAPPING #-} Has a (Entity (a ': ts)) where
 instance {-# OVERLAPPING #-} (Has a (Entity ts)) => Has a (Entity (b ': ts)) where
   component (ECons _ xs) = component xs
 
+-- | Create an entity from a component.
 entity :: t -> Entity '[t]
 entity t = ECons t ENil
 
+-- | Append a component to an entity.
 (<&>) :: Entity ts -> t -> Entity (t ': ts)
 (<&>) = flip ECons
 
@@ -61,6 +66,7 @@ type family EntityT a where
   EntityT (Entity ts) = ts
   EntityT a = '[a]
 
+-- | Convert from an @Entity@.
 class FromEntity a where
   fromEntity :: Entity (EntityT a) -> a
 
@@ -73,6 +79,7 @@ instance FromEntity (Entity ts) where
 instance (FromEntity a, FromEntity b, EntityT (a :& b) ~ (a ': EntityT b)) => FromEntity (a :& b) where
   fromEntity (ECons a rest) = a :& fromEntity rest
 
+-- | Convert to an @Entity@.
 class ToEntity a where
   toEntity :: a -> Entity (EntityT a)
 
@@ -85,6 +92,7 @@ instance ToEntity (Entity ts) where
 instance (ToEntity a, ToEntity b, EntityT (a :& b) ~ (a ': EntityT b)) => ToEntity (a :& b) where
   toEntity (a :& b) = ECons a (toEntity b)
 
+-- | Insertable entity.
 class Insertable a where
   spawn :: a -> World -> (EntityID, World)
   insert :: EntityID -> a -> World -> World

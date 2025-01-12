@@ -22,14 +22,14 @@ import Prelude hiding (lookup)
 newtype ComponentID = ComponentID {unComponentId :: Int}
   deriving (Eq, Ord, Show)
 
--- | World of entities and components.
+-- | Map of component IDs.
 data Components = Components
   { componentIds :: Map TypeRep ComponentID,
     nextComponentId :: ComponentID
   }
   deriving (Show)
 
--- | Empty world.
+-- | Empty @Components@.
 empty :: Components
 empty =
   Components
@@ -37,18 +37,19 @@ empty =
       nextComponentId = ComponentID 0
     }
 
--- | Insert a `ComponentID` into the `World`.
+-- | Insert a @ComponentID@ into @Components@.
 insert :: forall c. (Typeable c) => Components -> (ComponentID, Components)
 insert w = case Map.lookup (typeOf (Proxy @c)) (componentIds w) of
   Just cId -> (cId, w)
   Nothing ->
     let cId = nextComponentId w
-        w' =
+     in ( cId,
           w
             { componentIds = Map.insert (typeOf (Proxy @c)) cId (componentIds w),
               nextComponentId = ComponentID (unComponentId cId + 1)
             }
-     in (cId, w')
+        )
 
+-- | Lookup a @ComponentID@ from @Components@.
 lookup :: forall c. (Typeable c) => Components -> Maybe ComponentID
 lookup w = Map.lookup (typeOf (Proxy @c)) (componentIds w)

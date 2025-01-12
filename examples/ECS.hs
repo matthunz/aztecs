@@ -10,11 +10,11 @@ import Data.Aztecs.Entity
 import qualified Data.Aztecs.World as W
 import Text.Pretty.Simple
 
-newtype X = X Int deriving (Eq, Show)
+newtype X = X Int deriving (Show)
 
 instance Component X
 
-newtype Y = Y Int deriving (Eq, Show)
+newtype Y = Y Int deriving (Show)
 
 instance Component Y
 
