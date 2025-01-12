@@ -1,3 +1,5 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -8,6 +10,7 @@ import qualified Data.Aztecs.Components as CS
 import Data.Aztecs.Entity (Component)
 import Data.Aztecs.Table (ColumnID (..), RowID (..), Table)
 import qualified Data.Aztecs.Table as Table
+import Data.Data (Proxy (..))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -39,8 +42,14 @@ data EntityRecord = EntityRecord
   }
   deriving (Show)
 
+data ComponentProxy = forall c. (Component c) => ComponentProxy (Proxy c)
+
+instance Show ComponentProxy where
+  show (ComponentProxy p) = show p
+
 data ComponentState = ComponentState
-  { componentColumnIds :: (Map ArchetypeID ColumnID)
+  { componentColumnIds :: (Map ArchetypeID ColumnID),
+    proxy :: ComponentProxy
   }
   deriving (Show)
 
@@ -78,7 +87,7 @@ spawn c w =
           let archId = nextArchetypeId w
               nextArch =
                 Archetype
-                  { archetypeIdSet =idSet,
+                  { archetypeIdSet = idSet,
                     archetypeTable = Table.singleton c,
                     archetypeAdd = Map.empty,
                     archetypeRemove = Map.empty
@@ -89,8 +98,13 @@ spawn c w =
                     componentStates =
                       Map.insert
                         cId
-                        (ComponentState {componentColumnIds = Map.empty})
+                        ( ComponentState
+                            { componentColumnIds = Map.empty,
+                              proxy = ComponentProxy (Proxy @c)
+                            }
+                        )
                         (componentStates w),
+                    entities = Map.insert e (EntityRecord {recordArchetypeId = archId, recordRowId = RowID 0}) (entities w),
                     nextEntityId = EntityID (unEntityId e + 1),
                     archetypes =
                       Map.insert
@@ -102,13 +116,100 @@ spawn c w =
                   }
               )
 
+insertArchetype :: Archetype -> World -> (ArchetypeID, World)
+insertArchetype arch w =
+  let archId = nextArchetypeId w
+   in ( archId,
+        w
+          { archetypes =
+              Map.insert
+                archId
+                arch
+                (archetypes w),
+            archetypeIds = Map.insert (archetypeIdSet arch) archId (archetypeIds w),
+            nextArchetypeId = ArchetypeID (unArchetypeId archId + 1)
+          }
+      )
+
+insert :: forall c. (Component c) => EntityID -> c -> World -> World
+insert e c w =
+  let (cId, components') = CS.insert @c (components w)
+   in case Map.lookup cId (componentStates w) of
+        Just _ -> insertWithId e cId c w {components = components'}
+        Nothing ->
+          let record = entities w Map.! e
+              arch = archetypes w Map.! recordArchetypeId record
+              nextIdSet = ComponentIDSet (Set.insert cId (unComponentIdSet (archetypeIdSet arch)))
+           in case Map.lookup nextIdSet (archetypeIds w) of
+                Just nextArchId -> error "TODO"
+                Nothing ->
+                  let nextArchId = nextArchetypeId w
+                      nextArch =
+                        Archetype
+                          { archetypeIdSet = nextIdSet,
+                            archetypeTable = Table.singleton c,
+                            archetypeAdd = Map.empty,
+                            archetypeRemove = Map.empty
+                          }
+                      (arch', nextArch') = moveRecord arch nextArch record w
+                      archetypes' =
+                        Map.fromList
+                          [ (recordArchetypeId record, arch'),
+                            (nextArchId, nextArch')
+                          ]
+                          <> archetypes w
+                   in w
+                        { archetypes = archetypes',
+                          archetypeIds = Map.insert (archetypeIdSet arch') (recordArchetypeId record) (archetypeIds w),
+                          nextArchetypeId = ArchetypeID (unArchetypeId nextArchId + 1)
+                        }
+
+insertWithId :: forall c. (Component c) => EntityID -> ComponentID -> c -> World -> World
+insertWithId e cId c w =
+  let record = entities w Map.! e
+      arch = archetypes w Map.! recordArchetypeId record
+      nextIdSet = ComponentIDSet (Set.insert cId (unComponentIdSet (archetypeIdSet arch)))
+   in case Map.lookup nextIdSet (archetypeIds w) of
+        Just nextArchId -> error "TODO"
+        Nothing ->
+          let nextArchId = nextArchetypeId w
+              nextArch =
+                Archetype
+                  { archetypeIdSet = nextIdSet,
+                    archetypeTable = Table.singleton c,
+                    archetypeAdd = Map.empty,
+                    archetypeRemove = Map.empty
+                  }
+              (arch', nextArch') = moveRecord arch nextArch record w
+              archetypes' =
+                Map.fromList
+                  [ (recordArchetypeId record, arch'),
+                    (nextArchId, nextArch')
+                  ]
+                  <> archetypes w
+           in w
+                { archetypes = archetypes',
+                  archetypeIds = Map.insert (archetypeIdSet arch') (recordArchetypeId record) (archetypeIds w),
+                  nextArchetypeId = ArchetypeID (unArchetypeId nextArchId + 1)
+                }
+
 moveRecord :: Archetype -> Archetype -> EntityRecord -> World -> (Archetype, Archetype)
 moveRecord arch nextArch record w =
   let f i (acc, nextAcc) =
         let cState = componentStates w Map.! i
-            colId = componentColumnIds cState Map.! recordArchetypeId record
-            nextColId = componentColumnIds cState Map.! recordArchetypeId record
-            (c, acc') = Table.remove colId (recordRowId record) (archetypeTable acc)
-            nextAcc' = Table.insert nextColId (recordRowId record) (archetypeTable nextAcc) c
-         in (arch {archetypeTable = acc'}, nextArch {archetypeTable = nextAcc'})
+         in moveComponent (proxy cState) record cState acc nextAcc
    in foldr f (arch, nextArch) (unComponentIdSet (archetypeIdSet arch))
+
+moveComponent :: ComponentProxy -> EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
+moveComponent (ComponentProxy p) = moveComponentProxy p
+
+moveComponentProxy :: forall c. (Component c) => Proxy c -> EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
+moveComponentProxy _ = moveComponent' @c
+
+moveComponent' :: forall c. (Component c) => EntityRecord -> ComponentState -> Archetype -> Archetype -> (Archetype, Archetype)
+moveComponent' record cState arch nextArch =
+  let colId = componentColumnIds cState Map.! recordArchetypeId record
+      nextColId = componentColumnIds cState Map.! recordArchetypeId record
+      (c, acc') = Table.remove @c colId (recordRowId record) (archetypeTable arch)
+      nextAcc' = Table.insert @c nextColId (recordRowId record) c (archetypeTable nextArch)
+   in (arch {archetypeTable = acc'}, nextArch {archetypeTable = nextAcc'})
