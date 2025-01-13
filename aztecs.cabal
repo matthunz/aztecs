@@ -13,6 +13,7 @@ library
     exposed-modules:
         Data.Aztecs
         Data.Aztecs.Archetype
+        Data.Aztecs.Archetypes
         Data.Aztecs.Entity
 
     hs-source-dirs:   src
