@@ -1,12 +1,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -17,8 +13,6 @@ import Data.Aztecs (EntityID (..))
 import Data.Aztecs.Archetypes
 import Data.Aztecs.Entity (Entity)
 import Data.Kind (Type)
-import Data.Vector (Vector)
-import qualified Data.Vector as V
 
 type family CombineT (a :: Type) (as :: [Type]) :: [[Type]] where
   CombineT a '[] = '[ '[a]]
@@ -42,11 +36,8 @@ instance Empty '[] where
 instance (EmptyArchetype a, Empty as) => Empty (a ': as) where
   empty = ASCons emptyArchetype empty
 
-class Spawn (a :: [Type]) (as :: [Type]) where
-  spawn :: Entity a -> World as -> World as
-
-instance (SpawnArchetypes a (CombineT' as)) => Spawn a as where
-  spawn x (World as e) = World (spawnArchetypes x as) (EntityID $ unEntityId e + 1)
+spawn :: (SpawnArchetypes a (CombineT' cs)) => Entity a -> World cs -> World cs
+spawn x (World as e) = World (spawnArchetypes x as) (EntityID $ unEntityId e + 1)
 
 world :: (Empty (CombineT' cs)) => World cs
 world = World empty (EntityID 0)

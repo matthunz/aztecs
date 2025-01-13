@@ -5,7 +5,6 @@ module Main where
 
 import Data.Aztecs.Entity
 import Data.Aztecs.World
-import Data.Aztecs
 import Text.Pretty.Simple
 
 main :: IO ()

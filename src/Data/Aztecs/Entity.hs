@@ -15,8 +15,6 @@ module Data.Aztecs.Entity where
 
 import Data.Aztecs
 import Data.Kind (Type)
-import Data.Vector (Vector)
-import qualified Data.Vector as V
 
 data Entity (ts :: [Type]) where
   ENil :: Entity '[]

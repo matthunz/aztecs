@@ -16,7 +16,6 @@ module Data.Aztecs.Archetypes where
 import Data.Aztecs.Archetype (Archetype (..))
 import Data.Aztecs.Entity (Entity (..))
 import Data.Kind (Type)
-import Data.Vector (Vector)
 import qualified Data.Vector as V
 
 data Archetypes (ts :: [[Type]]) where
