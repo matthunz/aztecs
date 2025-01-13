@@ -13,9 +13,11 @@ import Text.Pretty.Simple
 main :: IO ()
 main = do
   let x = ACons (pure (1 :: Int)) (ACons (pure True) ANil)
-      y = Data.Aztecs.Archetype.map x (\((ECons i ENil) :: Entity '[Int]) -> ECons (i + 1) ENil)
       z = A.lookup @'[Bool] 0 x
       x' = ACons (pure (2 :: Int)) ANil
       as = AS.ACons x' (AS.ACons x AS.ANil)
-      z' = AS.match @_ @'[Bool] as
-  pPrint z'
+      as' =
+        AS.map
+          (\((ECons i ENil) :: Entity '[Int]) -> ECons (i + 1) ENil)
+          as
+  pPrint as'
