@@ -1,35 +1,15 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
-import Control.Monad.IO.Class
-import Data.Aztecs.Edit (Edit)
-import qualified Data.Aztecs.Edit as C
-import Data.Aztecs.Entity
-import qualified Data.Aztecs.Query as Q
-import qualified Data.Aztecs.World as W
+import Data.Aztecs.Archetype
 import Text.Pretty.Simple
-
-newtype Position = Position Int deriving (Show)
-
-instance Component Position
-
-newtype Velocity = Velocity Int deriving (Show)
-
-instance Component Velocity
-
-app :: Edit IO ()
-app = do
-  C.spawn_ $ entity (Position 0) <&> Velocity 1
-  C.spawn_ $ entity (Position 2) <&> Velocity 2
-
-  positions <- Q.map $
-    \(Position p :& Velocity v) -> Position (p + v)
-
-  liftIO $ pPrint positions
+import Data.Aztecs.Entity (Entity (ECons, ENil))
 
 main :: IO ()
 main = do
-  _ <- C.runEdit app W.empty
-  return ()
+  let x = ACons (pure (1 :: Int)) (ACons (pure True) ANil)
+      y = Data.Aztecs.Archetype.map  x  (\((ECons i ENil) :: Entity '[Int]) -> ECons (i + 1) ENil)
+  pPrint y

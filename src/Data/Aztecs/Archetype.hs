@@ -3,28 +3,75 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Data.Aztecs.Archetype where
 
+import Data.Aztecs
+import Data.Aztecs.Entity
 import Data.Kind (Type)
 import Data.Vector (Vector)
+import qualified Data.Vector as V
 
 data Archetype (as :: [Type]) where
-  ENil :: Archetype '[]
-  ECons :: Vector a -> Archetype as -> Archetype (a ': as)
+  ANil :: Archetype '[]
+  ACons :: Vector a -> Archetype as -> Archetype (a ': as)
 
 instance Show (Archetype '[]) where
-  show ENil = "[]"
+  show ANil = "[]"
 
 instance (Show a, ShowArchetype (Archetype as)) => Show (Archetype (a ': as)) where
-  show (ECons x xs) = "[ " ++ show x ++ showArchetype xs
+  show (ACons x xs) = "[ " ++ show x ++ showArchetype xs
 
 class ShowArchetype a where
   showArchetype :: a -> String
 
 instance ShowArchetype (Archetype '[]) where
-  showArchetype ENil = "]"
+  showArchetype ANil = "]"
 
 instance (Show a, ShowArchetype (Archetype as)) => ShowArchetype (Archetype (a ': as)) where
-  showArchetype (ECons x xs) = ", " ++ show x ++ showArchetype xs
+  showArchetype (ACons x xs) = ", " ++ show x ++ showArchetype xs
+
+class Match (as :: [Type]) (es :: [Type]) where
+  match :: Archetype as -> [Entity es]
+  alter :: [Entity es] -> Archetype as -> Archetype as
+
+instance Match as '[] where
+  match _ = []
+  alter _ as = as
+
+instance {-# OVERLAPS #-} (Has (Vector e) (Archetype as)) => Match as '[e] where
+  match as =
+    let es = V.toList $ component as
+        f e = ECons e ENil
+     in fmap f es
+  alter es as =
+    let (es', es'') = unzip $ fmap (\(ECons e t) -> (e, t)) es
+        as' = setComponent (V.fromList $ es') as
+     in alter es'' as'
+
+instance (Match as es, Has [e] (Archetype as)) => Match as (e ': es) where
+  match as =
+    let es = component as
+        entities = match as
+        f (e, y) = ECons e y
+     in fmap f (zip es entities)
+  alter es as =
+    let (es', es'') = unzip $ fmap (\(ECons e t) -> (e, t)) es
+        as' = setComponent es' as
+     in alter es'' as'
+
+instance {-# OVERLAPPING #-} Has (Vector a) (Archetype (a ': ts)) where
+  component (ACons v _) = v
+  setComponent v (ACons _ xs) = ACons v xs
+
+instance {-# OVERLAPPING #-} (Has (Vector a) (Archetype ts)) => Has (Vector a) (Archetype (b ': ts)) where
+  component (ACons _ xs) = component xs
+  setComponent v (ACons x xs) = ACons x (setComponent v xs)
+
+map :: (Match as bs) => Archetype as -> (Entity bs -> Entity bs) -> Archetype as
+map a f =
+  let es = match a
+      es' = fmap f es
+   in alter es' a

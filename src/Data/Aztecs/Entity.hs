@@ -3,10 +3,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Data.Aztecs.Entity where
 
+import Data.Aztecs
 import Data.Kind (Type)
 
 data Entity (as :: [Type]) where
@@ -27,3 +29,11 @@ instance ShowEntity (Entity '[]) where
 
 instance (Show a, ShowEntity (Entity as)) => ShowEntity (Entity (a ': as)) where
   showEntity (ECons x xs) = ", " ++ show x ++ showEntity xs
+
+instance {-# OVERLAPPING #-} Has a (Entity (a ': ts)) where
+  component (ECons x _) = x
+  setComponent x (ECons _ xs) = ECons x xs
+
+instance {-# OVERLAPPING #-} (Has a (Entity ts)) => Has a (Entity (b ': ts)) where
+  component (ECons _ xs) = component xs
+  setComponent x (ECons y xs) = ECons y (setComponent x xs)
