@@ -121,6 +121,3 @@ map a f =
   let es = match a
       es' = fmap f es
    in alter es' a
-
-(<&>) :: Archetype ts -> [t] -> Archetype (t : ts)
-(<&>) a v = ACons (V.fromList v) a

@@ -45,3 +45,6 @@ instance {-# OVERLAPPING #-} (Has a (Entity ts)) => Has a (Entity (b ': ts)) whe
 
 entity :: a -> Entity '[a]
 entity = flip ECons ENil
+
+(<&>) :: Entity as -> a -> Entity (a : as)
+(<&>) es c = ECons c es

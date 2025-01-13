@@ -55,20 +55,24 @@ instance EmptyArchetype '[] where
 instance (EmptyArchetype as) => EmptyArchetype (a ': as) where
   emptyArchetype = ACons V.empty emptyArchetype
 
-class SpawnArchetype (a :: [Type]) (as :: [Type]) where
-  spawnArchetype :: Entity a -> Archetype as -> Archetype as
+class SpawnArchetype (as :: [Type]) where
+  spawnArchetype :: Entity as -> Archetype as -> Archetype as
 
-instance SpawnArchetype '[] as where
-  spawnArchetype _ as = as
-
-instance (SpawnArchetype as as) => SpawnArchetype (a ': as) (a ': as) where
+instance SpawnArchetype as where
+  spawnArchetype ENil ANil = ANil
   spawnArchetype (ECons e es) (ACons v as) = ACons (V.cons e v) (spawnArchetype es as)
-
-class EmptyArchetypes (as :: [[Type]]) where
-  emptyArchetypes :: Archetypes as
 
 class SpawnArchetypes (a :: [Type]) (as :: [[Type]]) where
   spawnArchetypes :: Entity a -> Archetypes as -> Archetypes as
 
-instance (SpawnArchetype a a) => SpawnArchetypes a (a ': as) where
+instance  {-# OVERLAPPING #-} SpawnArchetypes a '[] where
+  spawnArchetypes _ ASNil = ASNil
+
+instance {-# OVERLAPPING #-} (SpawnArchetype a) => SpawnArchetypes a '[a] where
   spawnArchetypes e (ASCons x xs) = ASCons (spawnArchetype e x) xs
+
+instance {-# OVERLAPPING #-}  (SpawnArchetype a) => SpawnArchetypes a (a ': as) where
+  spawnArchetypes e (ASCons x xs) = ASCons (spawnArchetype e x) xs
+
+instance  {-# OVERLAPPING #-} (SpawnArchetypes a as) => SpawnArchetypes a (b ': as) where
+  spawnArchetypes e (ASCons x xs) = ASCons x (spawnArchetypes e xs)

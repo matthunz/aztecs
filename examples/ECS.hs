@@ -9,7 +9,7 @@ import Text.Pretty.Simple
 
 main :: IO ()
 main = do
-  let w = world @'[Bool]
-      (e, w') = spawn @_ @'[Bool] (entity True) w
-      x = Data.Aztecs.World.lookup @'[Bool] e w'
+  let w = world @'[Bool, Int]
+      (e, w') = spawn (entity (0 :: Int) <&> True) w
+      x = Data.Aztecs.World.lookup @'[Bool, Int] e w'
   pPrint x

@@ -59,19 +59,19 @@ instance (EmptyArchetype a, Empty as) => Empty (a ': as) where
   empty = ASCons emptyArchetype empty
 
 spawn ::
-  forall a as cs.
-  ( Typeable a,
-    SpawnArchetypes a (CombineT' cs),
-    A.Lookup as a,
+  forall as cs.
+  ( Typeable as,
+    SpawnArchetypes as (CombineT' cs),
+    A.Lookup as as,
     Has (A.Archetype as) (Archetypes (CombineT' cs))
   ) =>
-  Entity a ->
+  Entity as ->
   World cs ->
   (EntityID, World cs)
 spawn x (World as rs e) =
   let r = Record @cs $ \i (World as' _ _) ->
         let arch = component @(A.Archetype as) as'
-         in A.lookup @as @a i arch
+         in A.lookup @as @as i arch
    in ( e,
         World
           (spawnArchetypes x as)
