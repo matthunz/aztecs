@@ -6,4 +6,5 @@ class Has a l where
   component :: l -> a
   setComponent :: a -> l -> l
 
-newtype EntityID = EntityID {unEntityId :: Int} deriving (Show)
+newtype EntityID = EntityID {unEntityId :: Int}
+ deriving (Eq, Ord, Show)

@@ -18,6 +18,7 @@ import Data.Aztecs.Entity (Entity (..))
 import Data.Kind (Type)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
+import Prelude hiding (lookup)
 
 data Archetype (ts :: [Type]) where
   ANil :: Archetype '[]
@@ -74,6 +75,43 @@ instance {-# OVERLAPPING #-} Has [a] (Archetype (a ': ts)) where
 instance {-# OVERLAPPING #-} (Has [a] (Archetype ts)) => Has [a] (Archetype (b ': ts)) where
   component (ACons _ xs) = component xs
   setComponent v (ACons x xs) = ACons x (setComponent v xs)
+
+instance {-# OVERLAPPING #-} Has (Vector a) (Archetype (a ': ts)) where
+  component (ACons v _) = v
+  setComponent v (ACons _ xs) = ACons v xs
+
+instance {-# OVERLAPPING #-} (Has (Vector a) (Archetype ts)) => Has (Vector a) (Archetype (b ': ts)) where
+  component (ACons _ xs) = component xs
+  setComponent v (ACons x xs) = ACons x (setComponent v xs)
+
+class Lookup (as :: [Type]) (es :: [Type]) where
+  lookup :: Int -> Archetype as -> Maybe (Entity es)
+
+instance Lookup as '[] where
+  lookup _ _ = Nothing
+
+instance {-# OVERLAPS #-} (Show (Archetype as), Has (Vector e) (Archetype as)) => Lookup as '[e] where
+  lookup i as = do
+    e <- component as V.!? i
+    return $ ECons e ENil
+
+instance (Lookup as es, Has (Vector e) (Archetype as)) => Lookup as (e ': es) where
+  lookup i as = do
+    e <- component as V.!? i
+    es <- lookup i as
+    return $ ECons e es
+
+class LookupRow (as :: [Type]) (e :: Type) where
+  lookupRow :: Archetype as -> Maybe e
+
+instance LookupRow '[] a where
+  lookupRow _ = Nothing
+
+instance (LookupRow as a) => LookupRow (b ': as) a where
+  lookupRow (ACons _ xs) = lookupRow xs
+
+instance LookupRow (a ': as) a where
+  lookupRow (ACons v _) = Just $ V.head v
 
 query :: (Match as bs) => Archetype as -> [Entity bs]
 query = match

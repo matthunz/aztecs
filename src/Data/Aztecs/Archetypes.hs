@@ -13,6 +13,7 @@
 
 module Data.Aztecs.Archetypes where
 
+import Data.Aztecs (Has (..))
 import Data.Aztecs.Archetype (Archetype (..))
 import Data.Aztecs.Entity (Entity (..))
 import Data.Kind (Type)
@@ -36,6 +37,14 @@ instance ShowArchetypes (Archetypes '[]) where
 
 instance (Show (Archetype cs), ShowArchetypes (Archetypes as)) => ShowArchetypes (Archetypes (cs ': as)) where
   showArchetypes (ASCons x xs) = ", " ++ show x ++ showArchetypes xs
+
+instance {-# OVERLAPPING #-} Has (Archetype as) (Archetypes (as ': as')) where
+  component (ASCons x _) = x
+  setComponent x (ASCons _ xs) = ASCons x xs
+
+instance {-# OVERLAPPING #-} (Has (Archetype cs) (Archetypes as)) => Has (Archetype cs) (Archetypes (bs ': as)) where
+  component (ASCons _ xs) = component xs
+  setComponent x (ASCons y xs) = ASCons y (setComponent x xs)
 
 class EmptyArchetype (as :: [Type]) where
   emptyArchetype :: Archetype as
