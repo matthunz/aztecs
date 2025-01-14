@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -6,6 +7,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -14,6 +17,7 @@ module Data.Aztecs.Archetype where
 
 import Data.Aztecs
 import Data.Aztecs.Entity
+import Data.Data (Proxy (..))
 import Data.Kind (Type)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
@@ -61,7 +65,8 @@ instance Match as '[] where
   alter _ as = as
   lookup' _ _ = Nothing
 
-instance {-# OVERLAPPING #-}
+instance
+  {-# OVERLAPPING #-}
   (Subset '[e] as ~ 'True, Has (Vector e) (Archetype as)) =>
   Match as '[e]
   where
@@ -79,7 +84,7 @@ instance {-# OVERLAPPING #-}
     e <- component as V.!? i
     return $ ECons e ENil
 
-instance 
+instance
   (Subset es as ~ 'True, Has (Vector e) (Archetype as), Match as es) =>
   Match as (e ': es)
   where
@@ -120,3 +125,43 @@ lookup ::
   Archetype as ->
   Maybe (Entity es)
 lookup = lookup'
+
+class MatchMaybe (as :: [Type]) (es :: [Type]) where
+  matchMaybe :: Archetype as -> [(Entity es)]
+
+instance {-# OVERLAPPING #-} (MatchMaybe'' (Subset '[e] as) as '[e]) => MatchMaybe as '[e] where
+  matchMaybe as = matchMaybe'' (Proxy :: Proxy (Subset '[e] as)) as
+
+instance (MatchMaybe' (Subset es as) as es) => MatchMaybe as es where
+  matchMaybe as = matchMaybe' (Proxy :: Proxy (Subset es as)) as
+
+class MatchMaybe'' (subset :: Bool) (as :: [Type]) (es :: [Type]) where
+  matchMaybe'' :: Proxy subset -> Archetype as -> [(Entity es)]
+
+instance
+  (Subset '[e] as ~ 'True, Has (Vector e) (Archetype as), Match as '[e]) =>
+  MatchMaybe'' 'True as '[e]
+  where
+  matchMaybe'' _ as =
+    let es = V.toList $ component as
+        f e = ECons e ENil
+     in fmap f es
+
+instance MatchMaybe'' 'False as es where
+  matchMaybe'' _ _ = []
+
+class MatchMaybe' (subset :: Bool) (as :: [Type]) (es :: [Type]) where
+  matchMaybe' :: Proxy subset -> Archetype as -> [(Entity es)]
+
+instance
+  (Subset es as ~ 'True, Has (Vector e) (Archetype as), Match as es) =>
+  MatchMaybe' 'True as (e ': es)
+  where
+  matchMaybe' _ as =
+    let es = V.toList $ component as
+        entities = match as
+        f (e, y) = ECons e y
+     in fmap f (zip es entities)
+
+instance MatchMaybe' 'False as es where
+  matchMaybe' _ _ = []

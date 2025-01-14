@@ -8,6 +8,7 @@ import Data.Aztecs.Archetype
 import qualified Data.Aztecs.Archetype as A
 import qualified Data.Aztecs.Archetypes as AS
 import Data.Aztecs.Entity (Entity (ECons, ENil))
+import Data.Data (Proxy (Proxy))
 import Text.Pretty.Simple
 
 main :: IO ()
@@ -20,4 +21,5 @@ main = do
         AS.map
           (\((ECons i ENil) :: Entity '[Int]) -> ECons (i + 1) ENil)
           as
-  pPrint as'
+      z' = AS.matchMaybe @_ @'[Int, Bool] (Proxy @'[Int, Bool]) as
+  pPrint z'
