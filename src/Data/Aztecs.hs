@@ -28,7 +28,6 @@ import Data.Data (TypeRep, Typeable)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
-import qualified Data.Set as Set
 import Data.Typeable (Proxy (..), typeOf)
 import Prelude hiding (lookup)
 

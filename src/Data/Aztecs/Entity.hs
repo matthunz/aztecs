@@ -11,7 +11,6 @@
 
 module Data.Aztecs.Entity where
 
-import Control.Monad.Identity (Identity (..))
 import Data.Aztecs.Row (Has (..), Row (..))
 import Data.Data (Proxy (..), TypeRep, Typeable, typeOf)
 import Data.Map (Map)
@@ -22,13 +21,18 @@ import Unsafe.Coerce (unsafeCoerce)
 newtype EntityID = EntityID {unEntityID :: Int}
   deriving (Eq, Ord, Show)
 
-newtype EntityRow as = EntityRow {unEntityRow :: Row Identity as}
+newtype EntityColumn a = EntityColumn {unEntityColumn :: a}
 
-instance (Show (Row Identity as)) => Show (EntityRow as) where
+instance Show a => Show (EntityColumn a) where
+  show (EntityColumn a) = show a
+
+newtype EntityRow as = EntityRow {unEntityRow :: Row EntityColumn as}
+
+instance (Show (Row EntityColumn as)) => Show (EntityRow as) where
   show (EntityRow row) = show row
 
-instance (Has (Identity a) (Row Identity as)) => Has a (EntityRow as) where
-  get e = let (Identity a) = get (unEntityRow e) in a
+instance (Has (EntityColumn a) (Row EntityColumn as)) => Has a (EntityRow as) where
+  get e = let (EntityColumn a) = get (unEntityRow e) in a
 
 data Entity as = Entity
   { entityRow :: EntityRow as,
@@ -41,7 +45,7 @@ instance (Show (EntityRow as)) => Show (Entity as) where
 entity :: forall a. (Typeable a, Has a (EntityRow '[a])) => a -> Entity '[a]
 entity a =
   Entity
-    { entityRow = EntityRow $ Cons (Identity a) Nil,
+    { entityRow = EntityRow $ Cons (EntityColumn a) Nil,
       getters = Map.singleton (typeOf (Proxy @a)) (\e -> unsafeCoerce (get @a e))
     }
 
@@ -53,7 +57,7 @@ entity a =
   Entity (a ': as)
 (<&>) e a =
   Entity
-    { entityRow = EntityRow $ Cons (Identity a) (unEntityRow $ entityRow e),
+    { entityRow = EntityRow $ Cons (EntityColumn a) (unEntityRow $ entityRow e),
       getters =
         Map.insert
           (typeOf (Proxy @a))

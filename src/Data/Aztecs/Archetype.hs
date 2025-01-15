@@ -10,8 +10,7 @@
 
 module Data.Aztecs.Archetype where
 
-import Control.Monad.Identity (Identity (..))
-import Data.Aztecs.Entity (Entity (..), EntityRow (..), entity)
+import Data.Aztecs.Entity (Entity (..), EntityRow (..), entity, EntityColumn (..))
 import Data.Aztecs.Row (Has (..), Row (..))
 import Data.Data (Proxy (..), Typeable, typeOf)
 import Data.Map (Map)
@@ -92,7 +91,7 @@ instance
   (Typeable a, ToArchetype as (EntityRow as)) =>
   ToArchetype (a : as) (EntityRow (a : as))
   where
-  toArchetype' (EntityRow (Cons (Identity e) es)) =
+  toArchetype' (EntityRow (Cons (EntityColumn e) es)) =
     let Archetype (ArchetypeRow nextRow) nextGs = toArchetype' (EntityRow es)
      in Archetype
           { archetypeRow = ArchetypeRow $ Cons (pure e) nextRow,

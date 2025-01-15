@@ -17,7 +17,7 @@ instance Show (Row f '[]) where
   show Nil = "[]"
 
 instance (Show (f a), Show' (Row f as)) => Show (Row f (a ': as)) where
-  show (Cons x xs) = "[ " ++ show x ++ showRow xs
+  show (Cons x xs) = "[" ++ show x ++ showRow xs
 
 class Show' a where
   showRow :: a -> String
