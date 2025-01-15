@@ -18,6 +18,8 @@ module Data.Aztecs
     (<&>),
     getComponentDyn,
     Archetype (..),
+    ToArchetype (..),
+    toArchetype,
   )
 where
 
@@ -28,6 +30,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Typeable (Proxy (..), typeOf)
 import Data.Vector (Vector)
+import qualified Data.Vector as V
 import GHC.Base (Any)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -100,4 +103,33 @@ getComponentDyn e = do
   f <- Map.lookup (typeOf (Proxy @a)) (getters e)
   return . unsafeCoerce $ f (entityRow e)
 
-newtype Archetype as = Archetype {unArchetype :: Row Vector as}
+newtype ArchetypeRow as = ArchetypeRow {unArchetypeRow :: Row Vector as}
+
+data Archetype as = Archetype
+  { archetypeRow :: ArchetypeRow as,
+    archetypeGetters :: Map TypeRep (Int -> ArchetypeRow as -> Maybe Any)
+  }
+
+class ToArchetype as a where
+  toArchetype' :: a -> Archetype as
+
+instance ToArchetype '[] (EntityRow '[]) where
+  toArchetype' _ = Archetype {archetypeRow = ArchetypeRow Nil, archetypeGetters = Map.empty}
+
+instance
+  (Typeable a, ToArchetype as (EntityRow as)) =>
+  ToArchetype (a : as) (EntityRow (a : as))
+  where
+  toArchetype' (EntityRow (Cons (Identity e) es)) =
+    let Archetype (ArchetypeRow nextRow) nextGs = toArchetype' (EntityRow es)
+     in Archetype
+          { archetypeRow = ArchetypeRow $ Cons (pure e) nextRow,
+            archetypeGetters =
+              Map.insert
+                (typeOf (Proxy @a))
+                (\i (ArchetypeRow (Cons v _)) -> unsafeCoerce <$> v V.!? i)
+                (fmap (\f -> \i (ArchetypeRow (Cons _ es')) -> f i (ArchetypeRow es')) nextGs)
+          }
+
+toArchetype :: (ToArchetype as (EntityRow as)) => Entity as -> Archetype as
+toArchetype = toArchetype' . entityRow
