@@ -3,6 +3,10 @@
 
 module Main where
 
+import Data.Aztecs
+
 main :: IO ()
 main = do
-  return ()
+  let e = entity (42 :: Int) <&> "Hello, World!"
+      x = getComponentDyn @Int e
+  print x
