@@ -24,6 +24,7 @@ module Data.Aztecs
     World (..),
     world,
     spawn,
+    lookup,
   )
 where
 
@@ -36,6 +37,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import GHC.Base (Any)
 import Unsafe.Coerce (unsafeCoerce)
+import Prelude hiding (lookup)
 
 newtype EntityID = EntityID {unEntityID :: Int}
   deriving (Eq, Ord, Show)
@@ -67,6 +69,9 @@ instance {-# OVERLAPPING #-} (Has (f a) (Row f ts)) => Has (f a) (Row f (b ': ts
 
 newtype EntityRow as = EntityRow {unEntityRow :: Row Identity as}
 
+instance (Show (Row Identity as)) => Show (EntityRow as) where
+  show (EntityRow row) = show row
+
 instance (Has (Identity a) (Row Identity as)) => Has a (EntityRow as) where
   get e = let (Identity a) = get (unEntityRow e) in a
 
@@ -74,6 +79,9 @@ data Entity as = Entity
   { entityRow :: EntityRow as,
     getters :: Map TypeRep (EntityRow as -> Any)
   }
+
+instance (Show (EntityRow as)) => Show (Entity as) where
+  show (Entity row _) = show row
 
 class Has a c where
   get :: c -> a
@@ -105,6 +113,46 @@ getComponentDyn :: forall a as. (Typeable a) => Entity as -> Maybe a
 getComponentDyn e = do
   f <- Map.lookup (typeOf (Proxy @a)) (getters e)
   return . unsafeCoerce $ f (entityRow e)
+
+class FromAnyArchetype a where
+  fromAnyArchetype :: Int -> AnyArchetype -> Maybe a
+
+instance FromAnyArchetype (Entity '[]) where
+  fromAnyArchetype _ _ = Nothing
+
+instance {-# OVERLAPPING #-} (Typeable a) => FromAnyArchetype (Entity '[a]) where
+  fromAnyArchetype i (AnyArchetype a) = do
+    f <- Map.lookup (typeOf (Proxy @a)) (archetypeGetters a)
+    e <- unsafeCoerce $ f i (archetypeRow a)
+    let e' = entity (unsafeCoerce e)
+        EntityRow (Cons x Nil) = entityRow e'
+    return $
+      ( e'
+          { entityRow = EntityRow $ Cons x Nil,
+            getters =
+              Map.singleton
+                (typeOf (Proxy @a))
+                (\e'' -> unsafeCoerce (get @a e''))
+          }
+      )
+
+instance (Typeable a, FromAnyArchetype (Entity as)) => FromAnyArchetype (Entity (a ': as)) where
+  fromAnyArchetype i (AnyArchetype a) = do
+    f <- Map.lookup (typeOf (Proxy @a)) (archetypeGetters a)
+    e <- unsafeCoerce $ f i (archetypeRow a)
+    let e' = entity (unsafeCoerce e)
+        EntityRow (Cons x Nil) = entityRow e'
+    Entity (EntityRow row') gs <- fromAnyArchetype @(Entity as) i (AnyArchetype a)
+    return $
+      ( e'
+          { entityRow = EntityRow $ Cons x row',
+            getters =
+              Map.insert
+                (typeOf (Proxy @a))
+                (\e'' -> unsafeCoerce (get @a e''))
+                (fmap (\g -> \(EntityRow (Cons _ es)) -> g (EntityRow es)) gs)
+          }
+      )
 
 newtype ArchetypeRow as = ArchetypeRow {unArchetypeRow :: Row Vector as}
 
@@ -191,3 +239,8 @@ spawn e (World as rs i) =
       (EntityID $ unEntityID i + 1)
   )
 
+lookup :: (FromAnyArchetype (Entity as)) => EntityID -> World -> Maybe (Entity as)
+lookup eId (World as rs _) = do
+  Record i f <- Map.lookup eId rs
+  let arch = f (archetypesRow as)
+  fromAnyArchetype i arch
