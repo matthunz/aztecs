@@ -18,15 +18,18 @@ module Data.Aztecs
     world,
     spawn,
     lookup,
+    query,
   )
 where
 
 import Data.Aztecs.Archetype (AnyArchetype (..), Archetype, Empty (..), FromAnyArchetype (..), ToArchetype, ToTypeSet (..), toArchetype)
+import qualified Data.Aztecs.Archetype as A
 import Data.Aztecs.Entity (Entity, EntityID (..), EntityRow)
 import Data.Aztecs.Row (Row (..))
 import Data.Data (TypeRep, Typeable)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Typeable (Proxy (..), typeOf)
 import Prelude hiding (lookup)
@@ -87,35 +90,49 @@ instance
       Nothing ->
         World
           (addArchetype (empty @(Archetype '[a])) archs)
-          ( fmap
-              ( \r ->
-                  r
-                    { archetypeRecordGetter = \(ArchetypesRow (Cons _ row')) ->
-                        (archetypeRecordGetter r)
-                          (ArchetypesRow row')
-                    }
+          ( Map.insert
+              (toTypeSet (Proxy @(Archetype '[a])))
+              ( ArchetypeRecord
+                  { archetypeRecordGetter = \(ArchetypesRow (Cons a _)) -> AnyArchetype a
+                  }
               )
-              archGs
+              ( fmap
+                  ( \r ->
+                      r
+                        { archetypeRecordGetter = \(ArchetypesRow (Cons _ row')) ->
+                            (archetypeRecordGetter r)
+                              (ArchetypesRow row')
+                        }
+                  )
+                  archGs
+              )
           )
           (mapRecords rs)
           i
 
-spawn :: (Typeable a, ToArchetype a (EntityRow a), Spawn (Archetype a)) => Entity a -> World -> (EntityID, World)
+spawn :: forall a. (Typeable a, ToArchetype a (EntityRow a), Spawn (Archetype a), ToTypeSet (Archetype a)) => Entity a -> World -> (EntityID, World)
 spawn e (World as archGs rs i) =
   ( i,
     spawn'
       (toArchetype e)
       ( World
           (addArchetype (toArchetype e) as)
-          ( fmap
-              ( \r ->
-                  r
-                    { archetypeRecordGetter = \(ArchetypesRow (Cons _ row')) ->
-                        (archetypeRecordGetter r)
-                          (ArchetypesRow row')
-                    }
+          ( Map.insert
+              (toTypeSet (Proxy @(Archetype a)))
+              ( ArchetypeRecord
+                  { archetypeRecordGetter = \(ArchetypesRow (Cons a _)) -> AnyArchetype a
+                  }
               )
-              archGs
+              ( fmap
+                  ( \r ->
+                      r
+                        { archetypeRecordGetter = \(ArchetypesRow (Cons _ row')) ->
+                            (archetypeRecordGetter r)
+                              (ArchetypesRow row')
+                        }
+                  )
+                  archGs
+              )
           )
           ( Map.insert
               i
@@ -147,3 +164,10 @@ lookup eId (World as _ rs _) = do
   Record i f <- Map.lookup eId rs
   let arch = f (archetypesRow as)
   fromAnyArchetype i arch
+
+query :: forall as. (A.Query (Entity as), ToTypeSet (Archetype as)) => World -> [Entity as]
+query (World as archGs _ _) =
+  let res = do
+        g <- Map.lookup (toTypeSet (Proxy @(Archetype as))) archGs
+        return . A.query $ (archetypeRecordGetter g) (archetypesRow as)
+   in fromMaybe [] res

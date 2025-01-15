@@ -10,6 +10,6 @@ import Data.Aztecs.Entity
 main :: IO ()
 main = do
   let e = entity (42 :: Int) <&> "Hello, World!"
-      (eId, w) = spawn e world
-      x = ECS.lookup @'[Int] eId w
+      (_, w) = spawn e world
+      x = ECS.query @'[String, Int] w
   print x

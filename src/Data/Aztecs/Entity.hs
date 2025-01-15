@@ -1,11 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -17,13 +19,14 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Base (Any)
 import Unsafe.Coerce (unsafeCoerce)
+import Prelude hiding (concat)
 
 newtype EntityID = EntityID {unEntityID :: Int}
   deriving (Eq, Ord, Show)
 
 newtype EntityColumn a = EntityColumn {unEntityColumn :: a}
 
-instance Show a => Show (EntityColumn a) where
+instance (Show a) => Show (EntityColumn a) where
   show (EntityColumn a) = show a
 
 newtype EntityRow as = EntityRow {unEntityRow :: Row EntityColumn as}
