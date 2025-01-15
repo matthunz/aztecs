@@ -2,11 +2,11 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE MonoLocalBinds #-}
 
 module Data.Aztecs.Archetype where
 
@@ -16,6 +16,8 @@ import Data.Aztecs.Row (Has (..), Row (..))
 import Data.Data (Proxy (..), Typeable, typeOf)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Typeable (TypeRep)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
@@ -104,6 +106,13 @@ instance
 toArchetype :: (ToArchetype as (EntityRow as)) => Entity as -> Archetype as
 toArchetype = toArchetype' . entityRow
 
-newtype ArchetypesRow as = ArchetypesRow {unArchetypesRow :: Row Archetype as}
+class ToTypeSet a where
+  toTypeSet :: Proxy a -> Set TypeRep
+
+instance ToTypeSet (Archetype '[]) where
+  toTypeSet _ = Set.empty
+
+instance (Typeable a, ToTypeSet (Archetype as)) => ToTypeSet (Archetype (a ': as)) where
+  toTypeSet _ = Set.insert (typeOf (Proxy @a)) (toTypeSet (Proxy @(Archetype as)))
 
 data AnyArchetype = forall as. AnyArchetype (Archetype as)

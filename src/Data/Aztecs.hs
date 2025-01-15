@@ -21,7 +21,7 @@ module Data.Aztecs
   )
 where
 
-import Data.Aztecs.Archetype (AnyArchetype (..), Archetype, ArchetypesRow (..), Empty (..), FromAnyArchetype (..), ToArchetype, toArchetype)
+import Data.Aztecs.Archetype (AnyArchetype (..), Archetype, Empty (..), FromAnyArchetype (..), ToArchetype, ToTypeSet (..), toArchetype)
 import Data.Aztecs.Entity (Entity, EntityID (..), EntityRow)
 import Data.Aztecs.Row (Row (..))
 import Data.Data (TypeRep, Typeable)
@@ -46,6 +46,8 @@ data ArchetypeRecord as = ArchetypeRecord
   { archetypeRecordGetter :: ArchetypesRow as -> AnyArchetype
   }
 
+newtype ArchetypesRow as = ArchetypesRow {unArchetypesRow :: Row Archetype as}
+
 data World
   = forall as. World
       (Archetypes as)
@@ -65,15 +67,6 @@ addArchetype a (Archetypes (ArchetypesRow row) gs) =
         (\(ArchetypesRow (Cons a' _)) -> AnyArchetype a')
         (fmap (\f -> \(ArchetypesRow (Cons _ row')) -> f (ArchetypesRow row')) gs)
     )
-
-class ToTypeSet a where
-  toTypeSet :: Proxy a -> Set TypeRep
-
-instance ToTypeSet (Archetype '[]) where
-  toTypeSet _ = Set.empty
-
-instance (Typeable a, ToTypeSet (Archetype as)) => ToTypeSet (Archetype (a ': as)) where
-  toTypeSet _ = Set.insert (typeOf (Proxy @a)) (toTypeSet (Proxy @(Archetype as)))
 
 class Spawn a where
   spawn' :: a -> World -> World
@@ -105,17 +98,7 @@ instance
               )
               archGs
           )
-          ( ( fmap
-                ( \r ->
-                    r
-                      { recordGetter =
-                          \(ArchetypesRow (Cons _ row')) ->
-                            (recordGetter r) (ArchetypesRow row')
-                      }
-                )
-                rs
-            )
-          )
+          (mapRecords rs)
           i
 
 spawn :: (Typeable a, ToArchetype a (EntityRow a), Spawn (Archetype a)) => Entity a -> World -> (EntityID, World)
@@ -142,19 +125,23 @@ spawn e (World as archGs rs i) =
                     recordGetter = \(ArchetypesRow (Cons a _)) -> AnyArchetype a
                   }
               )
-              ( fmap
-                  ( \r ->
-                      r
-                        { recordGetter =
-                            \(ArchetypesRow (Cons _ row')) -> (recordGetter r) (ArchetypesRow row')
-                        }
-                  )
-                  rs
-              )
+              (mapRecords rs)
           )
           (EntityID $ unEntityID i + 1)
       )
   )
+
+mapRecords :: Map EntityID (Record as) -> Map EntityID (Record (a ': as))
+mapRecords rs =
+  fmap
+    ( \r ->
+        r
+          { recordGetter =
+              \(ArchetypesRow (Cons _ row')) ->
+                (recordGetter r) (ArchetypesRow row')
+          }
+    )
+    rs
 
 lookup :: (FromAnyArchetype (Entity as)) => EntityID -> World -> Maybe (Entity as)
 lookup eId (World as _ rs _) = do

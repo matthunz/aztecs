@@ -5,6 +5,7 @@ module Main where
 
 import Data.Aztecs
 import qualified Data.Aztecs as ECS
+import Data.Aztecs.Entity
 
 main :: IO ()
 main = do
